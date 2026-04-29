@@ -38,4 +38,4 @@ jobs:
           push: true
           tags: |
             ghcr.io/${{ github.repository }}:${{ github.sha }}-${{matrix.container}}
-            ${{ github.event_name == 'push' && format('ghcr.io/{0}:latest${{ matrix.container }}', github.repository) || '' }}
+            ${{ github.event_name == 'push' && format('ghcr.io/{0}:latest{1}', github.repository, matrix.container) || '' }}
