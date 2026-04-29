@@ -1,0 +1,14 @@
+services:
+  fe:
+    image: ghcr.io/martin-nef/smart-reviewer:latest-fe
+    environment:
+      API_URL: "http://127.0.0.1:3000"
+    ports:
+      - "127.0.0.1:80:80"
+  be:
+    image: ghcr.io/martin-nef/smart-reviewer:latest-be
+    env_file:
+      - path: be/.env
+        required: false
+    ports:
+      - "127.0.0.1:3000:3000"
