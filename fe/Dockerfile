@@ -1,18 +1,33 @@
-FROM nginx:alpine                                                                                                                                  
-RUN cat > /usr/share/nginx/html/index.html.template <<'EOF'                         
-<!DOCTYPE html>                                                                                                                                      
-<html>                                                                                                                                               
-<body>                                                                                                                                               
-<h1>Hello, World!</h1>                                                                                                                             
-<pre id="response">Loading...</pre>
-<script>
-    fetch("${API_URL}")
-    .then(r => r.text())
-    .then(t => document.getElementById("response").textContent = t)
-    .catch(e => document.getElementById("response").textContent = "Error: " + e);
-</script>
-</body>
-</html>
+FROM node:22-alpine AS build
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+FROM nginx:alpine
+RUN rm /etc/nginx/conf.d/default.conf
+COPY --from=build /app/dist /usr/share/nginx/html
+
+RUN cat > /etc/nginx/conf.d/default.conf <<'EOF'
+server {
+  listen 80;
+  server_name _;
+  root /usr/share/nginx/html;
+  index index.html;
+  location / {
+    try_files $uri $uri/ /index.html;
+  }
+}
 EOF
-CMD ["/bin/sh", "-c", "envsubst '$API_URL' < /usr/share/nginx/html/index.html.template > /usr/share/nginx/html/index.html && nginx -g 'daemon off;'"]
+
+RUN cat > /docker-entrypoint.d/99-env.sh <<'EOF'
+#!/bin/sh
+set -e
+cat > /usr/share/nginx/html/env.js <<INNER
+window.__ENV__ = { API_URL: "${API_URL}" };
+INNER
+EOF
+RUN chmod +x /docker-entrypoint.d/99-env.sh
+
 EXPOSE 80

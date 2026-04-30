@@ -1,0 +1,16 @@
+development:
+  clients:
+    default:
+      uri: <%= ENV["MONGO_URI"] || "mongodb://localhost:27017/smart_reviewer_development" %>
+
+test:
+  clients:
+    default:
+      uri: <%= ENV["MONGO_URI"] || "mongodb://localhost:27017/smart_reviewer_test" %>
+
+production:
+  clients:
+    default:
+      uri: <%= ENV["MONGO_URI"] || "mongodb://mongo:27017/smart_reviewer" %>
+      options:
+        server_selection_timeout: 5
