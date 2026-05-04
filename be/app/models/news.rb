@@ -3,14 +3,19 @@
 class News
   include Mongoid::Document
 
-  belongs_to :search
+  belongs_to :search, optional: true
 
-  field :title, type: String, validates: { presence: true }
-  field :url, type: String, validates: { presence: true, format: URI.regexp(["http", "https"]) }
-  field :content, type: String, validates: { presence: true }
+  field :title, type: String
+  field :url, type: String
+  field :content, type: String
   field :summary, type: String
   field :image_url, type: String
-  field :sentiment, type: String, validates: { inclusion: { in: ["positive", "negative", "neutral"] } }
+  field :sentiment, type: String
+
+  validates :title, presence: true
+  validates :url, presence: true, format: URI.regexp(["http", "https"])
+  validates :content, presence: true
+  validates :sentiment, inclusion: { in: ["positive", "negative", "neutral"] }, allow_nil: true
 
   def serialize
     {

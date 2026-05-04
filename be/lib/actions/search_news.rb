@@ -34,7 +34,7 @@ module Actions
     end
 
     def persist_articles(articles)
-      articles.map do |article|
+      news = articles.map do |article|
         {
           title: article["title"],
           url: article["url"],

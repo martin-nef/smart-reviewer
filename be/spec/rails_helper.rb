@@ -12,4 +12,8 @@ RSpec.configure do |config|
   config.use_active_record = false
   config.filter_rails_from_backtrace!
   config.include(FactoryBot::Syntax::Methods)
+
+  config.after(:each) do
+    Mongoid.purge!
+  end
 end

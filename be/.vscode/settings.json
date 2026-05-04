@@ -46,6 +46,8 @@
   },
   "[json]": {
     "editor.formatOnSave": true,
+    "editor.tabSize": 2,
+    "editor.insertSpaces": true,
   },
   "files.associations": {
     "Gemfile": "ruby",
