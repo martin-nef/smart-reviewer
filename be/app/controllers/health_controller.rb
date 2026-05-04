@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class HealthController < ApplicationController
   def show
     ok =
@@ -7,6 +9,6 @@ class HealthController < ApplicationController
       rescue StandardError
         false
       end
-    render json: { status: ok ? "ok" : "degraded", mongo: ok }, status: ok ? :ok : :service_unavailable
+    render(json: { status: ok ? "ok" : "degraded", mongo: ok }, status: ok ? :ok : :service_unavailable)
   end
 end
