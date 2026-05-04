@@ -1,0 +1,6 @@
+{
+  "recommendations": [
+    "Shopify.ruby-lsp",
+    "sorbet.sorbet-vscode-extension",
+  ]
+}

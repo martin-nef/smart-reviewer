@@ -2,7 +2,7 @@
 
 # Start mongo (docker), then run BE + FE locally with hot reload.
 # Ctrl-C stops both processes.
-dev: mongo
+dev: mongo deps
 	@trap 'kill 0' INT TERM EXIT; \
 			$(MAKE) --no-print-directory be & \
 			$(MAKE) --no-print-directory fe & \
