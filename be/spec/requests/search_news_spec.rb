@@ -14,7 +14,7 @@ RSpec.describe("GET /search_news", type: :request) do
     expect(response).to(have_http_status(:ok))
     json = JSON.parse(response.body)
     expect(json.length).to(eq(2))
-    expect(json.first.keys).to(match_array(%w[title url summary sentiment image_url]))
+    expect(json.first.keys).to(match_array(["title", "url", "summary", "sentiment", "image_url"]))
   end
 
   it "passes query and page params to the action" do
