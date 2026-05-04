@@ -11,4 +11,14 @@ class News
   field :summary, type: String
   field :image_url, type: String
   field :sentiment, type: String, validates: { inclusion: { in: ["positive", "negative", "neutral"] } }
+
+  def serialize
+    {
+      title: title,
+      url: url,
+      summary: summary,
+      sentiment: sentiment,
+      image_url: image_url,
+    }
+  end
 end
