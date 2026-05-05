@@ -6,5 +6,6 @@ Rails.application.routes.draw do
   root to: ->(_) { [200, { "Content-Type" => "application/json" }, [%({"service":"smart-reviewer-be"})]] }
   get "search_news" => "search_news#get"
   post "news/:id/summarise" => "news#summarise"
+  get "news/:id/events" => "news#events"
   get "news/:id" => "news#show"
 end
