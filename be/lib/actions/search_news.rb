@@ -48,9 +48,7 @@ module Actions
           title: article["title"],
           url: article["url"],
           content: article["content"],
-          summary: article["description"] || "",
           image_url: article["image"] || "",
-          sentiment: "neutral",
           search: @search,
         }
       end

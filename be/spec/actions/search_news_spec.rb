@@ -3,7 +3,7 @@
 RSpec.describe(Actions::SearchNews) do
   let(:search) { create(:search, query: "ruby", page: 1) }
 
-  subject(:action) { described_class.new(search, 1) }
+  subject(:action) { described_class.new(search) }
 
   let(:fixture_json) { File.read(Rails.root.join("spec/fixtures/gnews_get_search.json")) }
 
@@ -21,23 +21,17 @@ RSpec.describe(Actions::SearchNews) do
       expect(params["q"]).to(eq("ruby"))
     end
 
-    it "sets page to the requested page number" do
+    it "sets page from the search object" do
       expect(params["page"]).to(eq("1"))
     end
 
-    it "clamps page to 1 when given zero" do
-      params = URI.decode_www_form(described_class.new(search, 0).query_url.query).to_h
-      expect(params["page"]).to(eq("1"))
-    end
-
-    it "clamps page to 1 when given a negative number" do
-      params = URI.decode_www_form(described_class.new(search, -5).query_url.query).to_h
-      expect(params["page"]).to(eq("1"))
+    it "sets lang to en" do
+      expect(params["lang"]).to(eq("en"))
     end
 
     it "encodes special characters in the query" do
       search_with_spaces = create(:search, query: "ruby on rails")
-      url = described_class.new(search_with_spaces, 1).query_url
+      url = described_class.new(search_with_spaces).query_url
       expect(url.to_s).not_to(include(" "))
       expect(URI.decode_www_form(url.query).to_h["q"]).to(eq("ruby on rails"))
     end
@@ -71,7 +65,14 @@ RSpec.describe(Actions::SearchNews) do
   end
 
   describe "#call" do
-    let(:ok_response) { double(code: "200", body: fixture_json) }
+    let(:ok_response) { double(code: "200", body: fixture_json, message: "OK") }
+
+    it "returns cached news without hitting the API when the search already has news" do
+      existing = create_list(:news, 2, search: search)
+      expect(Net::HTTP).not_to(receive(:get_response))
+
+      expect(action.call.to_a).to(match_array(existing))
+    end
 
     it "fetches articles from GNews and persists them under the search" do
       allow(Net::HTTP).to(receive(:get_response).and_return(ok_response))
@@ -80,19 +81,19 @@ RSpec.describe(Actions::SearchNews) do
     end
 
     it "raises RateLimitError on a 429 response" do
-      allow(Net::HTTP).to(receive(:get_response).and_return(double(code: "429", message: "Too Many Requests")))
+      allow(Net::HTTP).to(receive(:get_response).and_return(double(code: "429", message: "Too Many Requests", body: "")))
 
       expect { action.call }.to(raise_error(Actions::SearchNews::RateLimitError))
     end
 
     it "raises UpstreamError on a 5xx response" do
-      allow(Net::HTTP).to(receive(:get_response).and_return(double(code: "503", message: "Service Unavailable")))
+      allow(Net::HTTP).to(receive(:get_response).and_return(double(code: "503", message: "Service Unavailable", body: "")))
 
       expect { action.call }.to(raise_error(Actions::SearchNews::UpstreamError))
     end
 
     it "raises UpstreamError on a 4xx response other than 429" do
-      allow(Net::HTTP).to(receive(:get_response).and_return(double(code: "401", message: "Unauthorized")))
+      allow(Net::HTTP).to(receive(:get_response).and_return(double(code: "401", message: "Unauthorized", body: "")))
 
       expect { action.call }.to(raise_error(Actions::SearchNews::UpstreamError))
     end

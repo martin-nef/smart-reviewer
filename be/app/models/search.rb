@@ -8,5 +8,4 @@ class Search
 
   field :query, type: String
   field :page, type: Integer
-  field :articles, type: Array
 end

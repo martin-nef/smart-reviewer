@@ -4,6 +4,5 @@ FactoryBot.define do
   factory :search do
     query { "test query" }
     page { 1 }
-    articles { [] }
   end
 end

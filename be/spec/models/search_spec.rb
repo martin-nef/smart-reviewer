@@ -7,7 +7,6 @@ RSpec.describe(Search) do
     it "exposes all expected attributes" do
       expect(search.query).to(be_a(String))
       expect(search.page).to(be_an(Integer))
-      expect(search.articles).to(be_an(Array))
     end
   end
 

@@ -17,10 +17,16 @@ RSpec.describe("GET /search_news", type: :request) do
     expect(json.first.keys).to(match_array(["id", "title", "url", "summary", "sentiment", "image_url"]))
   end
 
-  it "passes query and page params to the action" do
+  it "passes a Search with the correct query and page to the action" do
     get "/search_news", params: { query: "ruby", page: 2 }
 
-    expect(Actions::SearchNews).to(have_received(:new).with(be_a(Search), "2"))
+    expect(Actions::SearchNews).to(have_received(:new).with(have_attributes(query: "ruby", page: 2)))
+  end
+
+  it "normalises page to 1 for zero or negative values" do
+    get "/search_news", params: { query: "ruby", page: 0 }
+
+    expect(Actions::SearchNews).to(have_received(:new).with(have_attributes(page: 1)))
   end
 
   context "when GNews is rate limiting" do
