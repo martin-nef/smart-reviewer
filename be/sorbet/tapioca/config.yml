@@ -1,8 +1,8 @@
 gem:
   # Add your `gem` command parameters here:
   #
-  # exclude:
-  # - gem_name
+  exclude:
+  - cgi  # typed: false to suppress stdlib conflict (unescape/unescapeURIComponent arity mismatch)
   # doc: true
   # workers: 5
 dsl:
