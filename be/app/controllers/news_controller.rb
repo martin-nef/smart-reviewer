@@ -34,13 +34,13 @@ class NewsController < ApplicationController
 
   private def change_stream_for(news)
     # TODO: replace with a pub/sub or DB trigger, e.g.
-    # 
+    #
     # pipeline = [{ "$match" => { "documentKey._id" => news.id } }]
     # News.collection.watch(pipeline, full_document: "updateLookup")
-    # 
+    #
     # The above example doesn't work with a simplistic local setup.
     # Mongo complains it needs a replica set.
-    
+
     iterations = (POLL_TIMEOUT / POLL_INTERVAL).to_i
     Enumerator.new do |y|
       iterations.times do
