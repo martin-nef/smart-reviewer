@@ -30,7 +30,7 @@ module Actions
     end
 
     def parse_articles(response)
-      JSON.parse(response.body)["articles"]
+      JSON.parse(response)["articles"]
     end
 
     def persist_articles(articles)

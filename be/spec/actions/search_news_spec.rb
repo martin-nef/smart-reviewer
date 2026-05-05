@@ -28,9 +28,8 @@ RSpec.describe(Actions::SearchNews) do
   end
 
   describe "#parse_articles" do
-    it "extracts the articles array from the response body" do
-      response = double(body: fixture_json)
-      articles = action.parse_articles(response)
+    it "extracts the articles array from the response string" do
+      articles = action.parse_articles(fixture_json)
 
       expect(articles).to(be_an(Array))
       expect(articles.length).to(eq(10))
@@ -53,8 +52,7 @@ RSpec.describe(Actions::SearchNews) do
 
   describe "#call" do
     it "fetches articles from GNews and persists them under the search" do
-      response = double(body: fixture_json)
-      allow(Net::HTTP).to(receive(:get).and_return(response))
+      allow(Net::HTTP).to(receive(:get).and_return(fixture_json))
 
       expect { action.call }.to(change(News, :count).by(10))
     end

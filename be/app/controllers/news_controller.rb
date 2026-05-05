@@ -33,8 +33,6 @@ class NewsController < ApplicationController
     News.collection.watch(pipeline, full_document: "updateLookup")
   end
 
-  public
-
   def summarise
     news = News.find(params[:id])
     EnrichNewsJob.perform_later(news.id)
