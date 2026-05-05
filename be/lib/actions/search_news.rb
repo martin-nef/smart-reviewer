@@ -15,22 +15,22 @@ module Actions
     end
 
     def query_url
-      query = URI.encode_uri_component(@search.query)
-      page = begin
-        @page.to_i
-      rescue StandardError
-        1
-      end
+      page = @page.to_i
       page = 1 if page <= 0
-      url = "https://gnews.io/api/v4/search?\
-           q=#{query}\
-           &page=#{page}\
-           &apiKey=#{ENV["GNEWS_API_KEY"]}"
-      URI(url)
+
+      URI::HTTPS.build(
+        host: "gnews.io",
+        path: "/api/v4/search",
+        query: URI.encode_www_form(
+          q: @search.query,
+          page: page,
+          apiKey: ENV["GNEWS_API_KEY"],
+        ),
+      )
     end
 
     def parse_articles(response)
-      JSON.parse(response)["articles"]
+      JSON.parse(response)["articles"] || []
     end
 
     def persist_articles(articles)
