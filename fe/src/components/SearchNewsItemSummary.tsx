@@ -10,6 +10,7 @@ interface Props {
 
 export default function SearchNewsItemSummary({ item, onError }: Props) {
   const [summary, setSummary] = useState<string | null>(item.summary)
+  const [sentiment, setSentiment] = useState<string | null>(item.sentiment)
   const [loading, setLoading] = useState(!item.summary)
   // Persists across StrictMode double-invoke so the POST fires exactly once
   const summariseSent = useRef(false)
@@ -31,6 +32,7 @@ export default function SearchNewsItemSummary({ item, onError }: Props) {
       received = true
       const data = JSON.parse(e.data) as NewsItem
       setSummary(data.summary)
+      setSentiment(data.sentiment)
       setLoading(false)
       es.close()
     }
@@ -42,6 +44,21 @@ export default function SearchNewsItemSummary({ item, onError }: Props) {
 
     return () => es.close()
   }, [item.id, item.summary, onError])
+
+  let sentimentEmoji = '';
+  switch (sentiment) {
+    case 'positive':
+      sentimentEmoji = '😊 ';
+      break
+    case 'negative':
+      sentimentEmoji = '😞 ';
+      break
+    case 'neutral':
+      sentimentEmoji = '😐 ';
+      break
+    default:
+      break;
+  }
 
   if (loading) {
     return (
@@ -55,6 +72,7 @@ export default function SearchNewsItemSummary({ item, onError }: Props) {
 
   return (
     <p className="px-4 pb-4 text-sm text-base-content/70 leading-relaxed">
+      {sentimentEmoji}
       {summary || 'No summary available.'}
     </p>
   )

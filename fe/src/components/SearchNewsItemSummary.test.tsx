@@ -60,7 +60,8 @@ afterEach(() => {
 describe('SearchNewsItemSummary', () => {
   it('shows existing summary immediately without calling API', () => {
     render(<SearchNewsItemSummary item={itemWithSummary} onError={vi.fn()} />)
-    expect(screen.getByText('Pre-existing summary text')).toBeInTheDocument()
+    expect(screen.getByText(/Pre-existing summary text/)).toBeInTheDocument()
+    expect(screen.getByText(/😊/)).toBeInTheDocument()
     expect(apiPost).not.toHaveBeenCalled()
     expect(MockEventSource.instance).toBeNull()
   })
@@ -85,7 +86,7 @@ describe('SearchNewsItemSummary', () => {
       MockEventSource.instance!.dispatchMessage(eventData)
     })
 
-    expect(screen.getByText(eventData.summary)).toBeInTheDocument()
+    expect(screen.getByText(`😊 ${eventData.summary}`)).toBeInTheDocument()
     expect(screen.queryByTestId('summary-skeleton')).not.toBeInTheDocument()
     expect(MockEventSource.instance!.close).toHaveBeenCalled()
   })
@@ -115,7 +116,7 @@ describe('SearchNewsItemSummary', () => {
       MockEventSource.instance!.dispatchError()
     })
 
-    expect(screen.getByText(eventData.summary)).toBeInTheDocument()
+    expect(screen.getByText(`😊 ${eventData.summary}`)).toBeInTheDocument()
     expect(onError).not.toHaveBeenCalled()
   })
 
