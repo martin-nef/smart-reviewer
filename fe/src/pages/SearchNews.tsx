@@ -20,6 +20,8 @@ export default function SearchNews() {
   useEffect(() => {
     const q = debouncedQuery.trim()
     if (!q) {
+      // TODO: use a library for debouncing to avoid state in effect 
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setResults([])
       setStatus('idle')
       return
