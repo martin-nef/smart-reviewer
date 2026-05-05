@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { API_URL } from '../config'
 import { apiPost } from '../api'
 import type { NewsItem } from '../types'
@@ -11,17 +11,24 @@ interface Props {
 export default function SearchNewsItemSummary({ item, onError }: Props) {
   const [summary, setSummary] = useState<string | null>(item.summary)
   const [loading, setLoading] = useState(!item.summary)
+  // Persists across StrictMode double-invoke so the POST fires exactly once
+  const summariseSent = useRef(false)
 
   useEffect(() => {
     if (item.summary) return
 
-    apiPost(`/news/${item.id}/summarise`, {}).catch(() => {
-      // summarise endpoint failure is non-fatal; SSE error will surface it
-    })
+    if (!summariseSent.current) {
+      summariseSent.current = true
+      apiPost(`/news/${item.id}/summarise`, {}).catch(() => {})
+    }
 
     const es = new EventSource(`${API_URL}/news/${item.id}/events`)
+    // Guard against onerror firing when the server closes the stream after a
+    // successful message — EventSource fires onerror on any connection close.
+    let received = false
 
     es.onmessage = (e) => {
+      received = true
       const data = JSON.parse(e.data) as NewsItem
       setSummary(data.summary)
       setLoading(false)
@@ -29,7 +36,7 @@ export default function SearchNewsItemSummary({ item, onError }: Props) {
     }
 
     es.onerror = () => {
-      onError('Failed to load summary')
+      if (!received) onError('Failed to load summary')
       es.close()
     }
 

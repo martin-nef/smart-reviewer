@@ -104,6 +104,21 @@ describe('SearchNewsItemSummary', () => {
     expect(MockEventSource.instance!.close).toHaveBeenCalled()
   })
 
+  it('does not call onError when onerror fires after a successful message', async () => {
+    const onError = vi.fn()
+    render(<SearchNewsItemSummary item={itemWithoutSummary} onError={onError} />)
+    await waitFor(() => expect(MockEventSource.instance).not.toBeNull())
+
+    act(() => {
+      MockEventSource.instance!.dispatchMessage(eventData)
+      // Simulate server closing stream (fires onerror) right after the message
+      MockEventSource.instance!.dispatchError()
+    })
+
+    expect(screen.getByText(eventData.summary)).toBeInTheDocument()
+    expect(onError).not.toHaveBeenCalled()
+  })
+
   it('closes EventSource on unmount', async () => {
     const { unmount } = render(<SearchNewsItemSummary item={itemWithoutSummary} onError={vi.fn()} />)
     await waitFor(() => expect(MockEventSource.instance).not.toBeNull())
