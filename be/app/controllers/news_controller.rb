@@ -18,6 +18,7 @@ class NewsController < ApplicationController
 
       change_stream_for(news).each do |_change|
         news.reload
+        Rails.logger.info("News updated: #{news.id} summary: #{news.summary.present?}")
         response.stream.write("data: #{news.serialize.to_json}\n\n")
         break
       end
@@ -28,9 +29,29 @@ class NewsController < ApplicationController
     end
   end
 
+  POLL_INTERVAL = 0.5
+  POLL_TIMEOUT  = 30
+
   private def change_stream_for(news)
-    pipeline = [{ "$match" => { "documentKey._id" => news.id } }]
-    News.collection.watch(pipeline, full_document: "updateLookup")
+    # TODO: replace with a pub/sub or DB trigger, e.g.
+    # 
+    # pipeline = [{ "$match" => { "documentKey._id" => news.id } }]
+    # News.collection.watch(pipeline, full_document: "updateLookup")
+    # 
+    # The above example doesn't work with a simplistic local setup.
+    # Mongo complains it needs a replica set.
+    
+    iterations = (POLL_TIMEOUT / POLL_INTERVAL).to_i
+    Enumerator.new do |y|
+      iterations.times do
+        sleep(POLL_INTERVAL)
+        news.reload
+        if news.summary.present?
+          y << {}
+          break
+        end
+      end
+    end
   end
 
   def summarise
