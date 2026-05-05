@@ -1,0 +1,26 @@
+[
+  {
+    "id": "abc001",
+    "title": "Apple Just Raised the Mac Mini's Starting Price",
+    "url": "https://www.macrumors.com/2026/05/02/apple-just-raised-mac-mini-starting-price/",
+    "summary": "Apple discontinued the 256GB Mac mini option, raising the starting price from $599 to $799 with M4 chip and 512GB storage.",
+    "sentiment": "neutral",
+    "image_url": "https://images.macrumors.com/t/mZt8b6Eq5CvEVF8j2RbWK6h2br8=/1600x/article-new/2026/02/Mac-mini-M4-Top.jpg"
+  },
+  {
+    "id": "abc002",
+    "title": "META or AMD: Cathie Wood Doubles Down on One Top AI Stock",
+    "url": "https://markets.businessinsider.com/news/stocks/meta-or-amd-cathie-wood-doubles-down-on-one-top-ai-stock-1036098212",
+    "summary": null,
+    "sentiment": null,
+    "image_url": "https://blog.tipranks.com/wp-content/uploads/2026/05/image-162-1024x343.png"
+  },
+  {
+    "id": "abc003",
+    "title": "Fallout 4 Free Download Officially Available For Millions Of Gamers",
+    "url": "https://screenrant.com/fallout-4-free-download-game-pass-ps-plus/",
+    "summary": null,
+    "sentiment": "positive",
+    "image_url": null
+  }
+]
