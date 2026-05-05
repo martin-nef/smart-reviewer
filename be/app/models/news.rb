@@ -19,6 +19,7 @@ class News
 
   def serialize
     {
+      id: _id,
       title: title,
       url: url,
       summary: summary,
