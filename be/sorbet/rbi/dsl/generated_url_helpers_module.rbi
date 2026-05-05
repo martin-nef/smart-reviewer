@@ -13,9 +13,6 @@ module GeneratedUrlHelpersModule
   def health_url(*args); end
 
   sig { params(args: T.untyped).returns(String) }
-  def news_url(*args); end
-
-  sig { params(args: T.untyped).returns(String) }
   def rails_health_check_url(*args); end
 
   sig { params(args: T.untyped).returns(String) }

@@ -13,9 +13,6 @@ module GeneratedPathHelpersModule
   def health_path(*args); end
 
   sig { params(args: T.untyped).returns(String) }
-  def news_path(*args); end
-
-  sig { params(args: T.untyped).returns(String) }
   def rails_health_check_path(*args); end
 
   sig { params(args: T.untyped).returns(String) }
