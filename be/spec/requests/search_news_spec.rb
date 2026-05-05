@@ -14,12 +14,12 @@ RSpec.describe("GET /search_news", type: :request) do
     expect(response).to(have_http_status(:ok))
     json = JSON.parse(response.body)
     expect(json.length).to(eq(2))
-    expect(json.first.keys).to(match_array(["title", "url", "summary", "sentiment", "image_url"]))
+    expect(json.first.keys).to(match_array(["id", "title", "url", "summary", "sentiment", "image_url"]))
   end
 
   it "passes query and page params to the action" do
     get "/search_news", params: { query: "ruby", page: 2 }
 
-    expect(Actions::SearchNews).to(have_received(:new).with("ruby", "2"))
+    expect(Actions::SearchNews).to(have_received(:new).with(be_a(Search), "2"))
   end
 end

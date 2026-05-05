@@ -2,7 +2,7 @@
 
 class NewsController < ApplicationController
   def summarise
-    news = News.find(params[:news_id])
+    news = News.find(params[:id])
     EnrichNewsJob.perform_later(news.id)
     render(json: { status: "ok" })
   end

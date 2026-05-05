@@ -2,8 +2,8 @@
 
 module Actions
   class SearchNews
-    def initialize(query, page)
-      @query = query
+    def initialize(search, page)
+      @search = search
       @page = page || 1
     end
 
@@ -15,7 +15,7 @@ module Actions
     end
 
     def query_url
-      query = URI.encode_uri_component(@query)
+      query = URI.encode_uri_component(@search.query)
       page = begin
         @page.to_i
       rescue StandardError
@@ -34,17 +34,18 @@ module Actions
     end
 
     def persist_articles(articles)
-      news = articles.map do |article|
+      news_attrs = articles.map do |article|
         {
           title: article["title"],
           url: article["url"],
           content: article["content"],
           summary: article["description"] || "",
-          image_url: article["urlToImage"] || "",
+          image_url: article["image"] || "",
           sentiment: "neutral",
+          search: @search,
         }
       end
-      News.create!(news)
+      News.create!(news_attrs)
     end
   end
 end

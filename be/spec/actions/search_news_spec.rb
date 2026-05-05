@@ -1,7 +1,9 @@
 # frozen_string_literal: true
 
 RSpec.describe(Actions::SearchNews) do
-  subject(:action) { described_class.new("ruby", 1) }
+  let(:search) { create(:search, query: "ruby", page: 1) }
+
+  subject(:action) { described_class.new(search, 1) }
 
   let(:fixture_json) { File.read(Rails.root.join("spec/fixtures/gnews_get_search.json")) }
 
@@ -15,12 +17,12 @@ RSpec.describe(Actions::SearchNews) do
     end
 
     it "clamps page to 1 when given zero" do
-      url = described_class.new("ruby", 0).query_url
+      url = described_class.new(search, 0).query_url
       expect(url.to_s).to(include("page=1"))
     end
 
     it "clamps page to 1 when given a negative number" do
-      url = described_class.new("ruby", -5).query_url
+      url = described_class.new(search, -5).query_url
       expect(url.to_s).to(include("page=1"))
     end
   end
@@ -39,13 +41,18 @@ RSpec.describe(Actions::SearchNews) do
   describe "#persist_articles" do
     let(:articles) { JSON.parse(fixture_json)["articles"] }
 
-    it "creates News records for each article" do
+    it "creates News records associated with the given search" do
       expect { action.persist_articles(articles) }.to(change(News, :count).by(10))
+    end
+
+    it "associates all News records with the search" do
+      news_list = action.persist_articles(articles)
+      expect(news_list.map(&:search_id).uniq).to(eq([search.id]))
     end
   end
 
   describe "#call" do
-    it "fetches articles from GNews and persists them as News records" do
+    it "fetches articles from GNews and persists them under the search" do
       response = double(body: fixture_json)
       allow(Net::HTTP).to(receive(:get).and_return(response))
 

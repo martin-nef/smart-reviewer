@@ -4,8 +4,9 @@ RSpec.describe(News) do
   describe "#serialize" do
     subject(:news) { build(:news) }
 
-    it "returns a hash with title, url, summary, sentiment, and image_url" do
+    it "returns a hash with id, title, url, summary, sentiment, and image_url" do
       expect(news.serialize).to(eq(
+        id: news.id,
         title: news.title,
         url: news.url,
         summary: news.summary,

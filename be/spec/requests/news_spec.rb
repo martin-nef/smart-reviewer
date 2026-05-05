@@ -2,12 +2,12 @@
 
 RSpec.describe("NewsController", type: :request) do
   describe "POST /news" do
-    let(:news) { create(:news) }
+    let!(:news) { create(:news) }
 
     before { allow(EnrichNewsJob).to(receive(:perform_later)) }
 
     it "enqueues EnrichNewsJob and returns ok status" do
-      post "/news", params: { news_id: news.id.to_s }
+      post "/news/#{news.id}/summarise"
 
       expect(response).to(have_http_status(:ok))
       expect(JSON.parse(response.body)).to(eq("status" => "ok"))
@@ -24,6 +24,7 @@ RSpec.describe("NewsController", type: :request) do
       expect(response).to(have_http_status(:ok))
       json = JSON.parse(response.body)
       expect(json).to(eq(
+        "id" => news.id.to_s,
         "title" => news.title,
         "url" => news.url,
         "summary" => news.summary,
