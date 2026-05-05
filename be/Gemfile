@@ -16,6 +16,7 @@ gem "mongoid", "~> 9.0"
 gem "tzinfo-data", platforms: [:windows, :jruby]
 
 gem "rack-cors"
+gem "openai"
 gem "dotenv-rails"
 
 group :development, :test do
