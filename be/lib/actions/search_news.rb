@@ -2,29 +2,38 @@
 
 module Actions
   class SearchNews
-    def initialize(search, page)
+    UpstreamError = Class.new(StandardError)
+    RateLimitError = Class.new(UpstreamError)
+
+    def initialize(search)
       @search = search
-      @page = page || 1
     end
 
     def call
-      response = Net::HTTP.get(query_url)
-      articles = parse_articles(response)
-      news = persist_articles(articles)
-      news
+      return @search.news if @search.news.any?
+
+      response = nil
+      response = Net::HTTP.get_response(query_url)
+      case response.code
+      when "429" then raise RateLimitError
+      when /^[45]/ then raise UpstreamError
+      end
+      articles = parse_articles(response.body)
+      persist_articles(articles)
+    rescue StandardError => e
+      Rails.logger.error("GNews API #{e.class} #{response&.code} #{response&.message}: #{response&.body.try("errors")}")
+      raise
     end
 
     def query_url
-      page = @page.to_i
-      page = 1 if page <= 0
-
       URI::HTTPS.build(
         host: "gnews.io",
         path: "/api/v4/search",
         query: URI.encode_www_form(
           q: @search.query,
-          page: page,
-          apiKey: ENV["GNEWS_API_KEY"],
+          page: @search.page,
+          lang: "en",
+          apikey: ENV["GNEWS_API_KEY"],
         ),
       )
     end

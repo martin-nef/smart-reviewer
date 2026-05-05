@@ -22,4 +22,34 @@ RSpec.describe("GET /search_news", type: :request) do
 
     expect(Actions::SearchNews).to(have_received(:new).with(be_a(Search), "2"))
   end
+
+  context "when GNews is rate limiting" do
+    before do
+      action_double = instance_double(Actions::SearchNews)
+      allow(action_double).to(receive(:call).and_raise(Actions::SearchNews::RateLimitError))
+      allow(Actions::SearchNews).to(receive(:new).and_return(action_double))
+    end
+
+    it "returns 429" do
+      get "/search_news", params: { query: "ruby" }
+
+      expect(response).to(have_http_status(:too_many_requests))
+      expect(JSON.parse(response.body)).to(eq("error" => "rate limited"))
+    end
+  end
+
+  context "when GNews returns an upstream error" do
+    before do
+      action_double = instance_double(Actions::SearchNews)
+      allow(action_double).to(receive(:call).and_raise(Actions::SearchNews::UpstreamError))
+      allow(Actions::SearchNews).to(receive(:new).and_return(action_double))
+    end
+
+    it "returns 503" do
+      get "/search_news", params: { query: "ruby" }
+
+      expect(response).to(have_http_status(:service_unavailable))
+      expect(JSON.parse(response.body)).to(eq("error" => "upstream error"))
+    end
+  end
 end
