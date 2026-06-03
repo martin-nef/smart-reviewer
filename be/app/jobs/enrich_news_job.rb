@@ -3,6 +3,8 @@
 class EnrichNewsJob < ApplicationJob
   queue_as :default
 
+  MODEL = "gpt-5-nano"
+
   class NewsAnalysis < OpenAI::BaseModel
     required :summary, String
     required :sentiment, String
@@ -17,7 +19,7 @@ class EnrichNewsJob < ApplicationJob
   def summarise(news)
     client = OpenAI::Client.new
     response = client.responses.create(
-      model: "gpt-4o-mini",
+      model: MODEL,
       input: [
         {
           role: :system,
@@ -31,7 +33,19 @@ class EnrichNewsJob < ApplicationJob
       text: NewsAnalysis,
     )
 
+    log_usage(response)
+
     result = response.output.flat_map(&:content).first.parsed
     [result.summary, result.sentiment]
+  end
+
+  private def log_usage(response)
+    usage = response.usage
+
+    Rails.logger.info(
+      "OpenAI call: model=#{response.model} " \
+        "input_tokens=#{usage.input_tokens} output_tokens=#{usage.output_tokens} " \
+        "total_tokens=#{usage.total_tokens}",
+    )
   end
 end

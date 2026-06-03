@@ -3,7 +3,11 @@
 RSpec.describe(EnrichNewsJob) do
   let(:mock_analysis) { double(summary: "A concise summary.", sentiment: "positive") }
   let(:mock_response) do
-    double(output: [double(content: [double(parsed: mock_analysis)])])
+    double(
+      output: [double(content: [double(parsed: mock_analysis)])],
+      model: "gpt-5-nano",
+      usage: double(input_tokens: 120, output_tokens: 45, total_tokens: 165),
+    )
   end
   let(:mock_client) { double(responses: double(create: mock_response)) }
 
@@ -39,7 +43,7 @@ RSpec.describe(EnrichNewsJob) do
 
       expect(mock_client.responses).to(have_received(:create).with(
         hash_including(
-          model: "gpt-4o-mini",
+          model: "gpt-5-nano",
           input: include(hash_including(role: :user, content: news.content)),
           text: EnrichNewsJob::NewsAnalysis,
         ),
