@@ -21,7 +21,12 @@ module Actions
       articles = parse_articles(response.body)
       persist_articles(articles)
     rescue StandardError => e
-      Rails.logger.error("GNews API #{e.class} #{response&.code} #{response&.message}: #{response&.body.try("errors")}")
+      Rails.logger.error(
+        "GNews API error: #{e.class} (#{e.message}) " \
+        "status=#{response&.code} #{response&.message} " \
+        "query=#{@search.query.inspect} page=#{@search.page} " \
+        "body=#{response&.body}",
+      )
       raise
     end
 
