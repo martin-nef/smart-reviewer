@@ -8,7 +8,7 @@ lint:
 typecheck:
 	bin/srb tc
 
-test:
+test: mongo
 	bin/rspec
 
 watch_test:
@@ -30,3 +30,6 @@ console:
 spoom_bump:
 	bin/spoom bump --from false --to true
 	bin/srb tc
+
+mongo:
+	cd .. && make mongo

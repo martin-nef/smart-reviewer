@@ -1,17 +1,33 @@
 # frozen_string_literal: true
 
 RSpec.describe("NewsController", type: :request) do
-  describe "POST /news" do
-    let!(:news) { create(:news) }
-
+  describe "POST /news/:id/summarise" do
     before { allow(EnrichNewsJob).to(receive(:perform_later)) }
 
-    it "enqueues EnrichNewsJob and returns ok status" do
-      post "/news/#{news.id}/summarise"
+    context "when news is already enriched" do
+      let(:news) { create(:news, summary: "asd") }
+      it "returns ok status without enqueuing job" do
+        post "/news/#{news.id}/summarise"
 
-      expect(response).to(have_http_status(:ok))
-      expect(JSON.parse(response.body)).to(eq("status" => "ok"))
-      expect(EnrichNewsJob).to(have_received(:perform_later).with(news.id))
+        aggregate_failures do
+          expect(response).to(have_http_status(:ok))
+          expect(JSON.parse(response.body)).to(eq("status" => "ok"))
+          expect(EnrichNewsJob).not_to(have_received(:perform_later))
+        end
+      end
+    end
+
+    context "when news is not enriched" do
+      let(:news) { create(:news, summary: nil) }
+      it "enqueues EnrichNewsJob and returns ok status" do
+        post "/news/#{news.id}/summarise"
+
+        aggregate_failures do
+          expect(response).to(have_http_status(:ok))
+          expect(JSON.parse(response.body)).to(eq("status" => "ok"))
+          expect(EnrichNewsJob).to(have_received(:perform_later).with(news.id))
+        end
+      end
     end
   end
 
