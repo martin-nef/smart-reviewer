@@ -23,9 +23,9 @@ module Actions
     rescue StandardError => e
       Rails.logger.error(
         "GNews API error: #{e.class} (#{e.message}) " \
-        "status=#{response&.code} #{response&.message} " \
-        "query=#{@search.query.inspect} page=#{@search.page} " \
-        "body=#{response&.body}",
+          "status=#{response&.code} #{response&.message} " \
+          "query=#{@search.query.inspect} page=#{@search.page} " \
+          "body=#{response&.body}",
       )
       raise
     end
