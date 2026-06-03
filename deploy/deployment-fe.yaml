@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: smart-reviewer-fe
+  namespace: smart-reviewer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: smart-reviewer-fe
+  template:
+    metadata:
+      labels:
+        app: smart-reviewer-fe
+    spec:
+      containers:
+        - name: fe
+          image: ghcr.io/martin-nef/smart-reviewer:latest-fe
+          ports:
+            - containerPort: 80
+          env:
+            - name: API_URL
+              value: "https://smart-reviewer-api.nefcloud.top"

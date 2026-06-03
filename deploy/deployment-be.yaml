@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: smart-reviewer-be
+  namespace: smart-reviewer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: smart-reviewer-be
+  template:
+    metadata:
+      labels:
+        app: smart-reviewer-be
+    spec:
+      containers:
+        - name: be
+          image: ghcr.io/martin-nef/smart-reviewer:latest-be
+          ports:
+            - containerPort: 3000
+          env:
+            - name: MONGO_URI
+              value: "mongodb://mongo:27017/smart_reviewer"
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: smart-reviewer-secrets
+                  key: OPENAI_API_KEY
+            - name: GNEWS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: smart-reviewer-secrets
+                  key: GNEWS_API_KEY

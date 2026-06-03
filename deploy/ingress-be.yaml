@@ -1,0 +1,17 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: smart-reviewer-api-ingress
+  namespace: smart-reviewer
+spec:
+  rules:
+    - host: smart-reviewer-api.nefcloud.top
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: smart-reviewer-api
+                port:
+                  number: 3000
