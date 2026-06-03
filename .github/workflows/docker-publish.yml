@@ -6,6 +6,12 @@ on:
   pull_request:
     types: [ labeled ]
 
+# Deploy sequentially: queue runs on the same branch and never cancel an
+# in-progress build/bump, so every commit gets built and deployed in order.
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build-and-push:
     if: >
