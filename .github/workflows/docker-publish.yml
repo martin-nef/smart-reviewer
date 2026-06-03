@@ -39,3 +39,36 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}:${{ github.sha }}-${{matrix.container}}
             ${{ github.event_name == 'push' && format('ghcr.io/{0}:latest-{1}', github.repository, matrix.container) || '' }}
+
+  # Trunk deploy: pin the deploy manifests to the freshly built image SHA and
+  # commit back to main. Flux's GitRepository (1m poll) picks up the commit and
+  # rolls the Deployment. The GITHUB_TOKEN push does not retrigger workflows, and
+  # "[skip ci]" guards against any future loop.
+  bump-manifests:
+    needs: build-and-push
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Pin deploy manifests to ${{ github.sha }}
+        run: |
+          repo="ghcr.io/${{ github.repository }}"
+          sed -i -E "s#(image: ${repo}):.*-be\$#\1:${{ github.sha }}-be#" deploy/deployment-be.yaml
+          sed -i -E "s#(image: ${repo}):.*-fe\$#\1:${{ github.sha }}-fe#" deploy/deployment-fe.yaml
+
+      - name: Commit and push
+        run: |
+          if git diff --quiet -- deploy; then
+            echo "Manifests already pinned to ${{ github.sha }}; nothing to do."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deploy/deployment-be.yaml deploy/deployment-fe.yaml
+          git commit -m "chore: deploy ${{ github.sha }} [skip ci]"
+          git push origin main
