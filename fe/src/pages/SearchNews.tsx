@@ -13,14 +13,29 @@ type Status = 'idle' | 'loading' | 'done' | 'error'
 // The outcome of one search, tagged with the query that produced it so that
 // status/results can be derived during render instead of synced via effects.
 type Outcome =
-  | { query: string; results: NewsItem[] }
+  | {
+      query: string
+      results: NewsItem[]
+      page: number
+      // The API doesn't report a total, so an empty page marks the end.
+      hasMore: boolean
+      loadingMore: boolean
+      moreFailed: boolean
+    }
   | { query: string; error: true }
+
+const rateLimitOrGenericMessage = (err: unknown, what: string) =>
+  err instanceof ApiError && err.status === 429
+    ? `${what} failed: the news API rate limit was reached. Please wait a moment and try again.`
+    : `${what} failed. Please try again.`
 
 export default function SearchNews() {
   const [query, setQuery] = useState('')
   const [outcome, setOutcome] = useState<Outcome | null>(null)
   const [toast, setToast] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const sentinelRef = useRef<HTMLDivElement>(null)
 
   const debouncedQuery = useDebounce(query, SEARCH_DEBOUNCE_MS)
   const q = debouncedQuery.trim()
@@ -44,16 +59,20 @@ export default function SearchNews() {
 
     apiGet<NewsItem[]>(`/search_news?query=${encodeURIComponent(q)}`)
       .then((results) => {
-        if (!cancelled) setOutcome({ query: q, results })
+        if (cancelled) return
+        setOutcome({
+          query: q,
+          results,
+          page: 1,
+          hasMore: results.length > 0,
+          loadingMore: false,
+          moreFailed: false,
+        })
       })
       .catch((err) => {
         if (cancelled) return
         setOutcome({ query: q, error: true })
-        setToast(
-          err instanceof ApiError && err.status === 429
-            ? 'Search failed: the news API rate limit was reached. Please wait a moment and try again.'
-            : 'Search failed. Please try again.',
-        )
+        setToast(rateLimitOrGenericMessage(err, 'Search'))
       })
 
     return () => { cancelled = true }
@@ -67,7 +86,60 @@ export default function SearchNews() {
       : 'error' in current
         ? 'error'
         : 'done'
-  const results = current && 'results' in current ? current.results : []
+  const loaded = current && 'results' in current ? current : null
+  const results = loaded?.results ?? []
+
+  const canLoadMore = !!loaded && loaded.hasMore && !loaded.loadingMore && !loaded.moreFailed
+  const nextPage = loaded ? loaded.page + 1 : 0
+
+  const loadMore = useCallback(() => {
+    setOutcome((prev) =>
+      prev && 'results' in prev && prev.query === q
+        ? { ...prev, loadingMore: true, moreFailed: false }
+        : prev,
+    )
+
+    apiGet<NewsItem[]>(`/search_news?query=${encodeURIComponent(q)}&page=${nextPage}`)
+      .then((more) => {
+        // Drop the response if the query changed while it was in flight.
+        setOutcome((prev) => {
+          if (!prev || !('results' in prev) || prev.query !== q) return prev
+          const seen = new Set(prev.results.map((r) => r.id))
+          return {
+            ...prev,
+            results: [...prev.results, ...more.filter((r) => !seen.has(r.id))],
+            page: nextPage,
+            hasMore: more.length > 0,
+            loadingMore: false,
+          }
+        })
+      })
+      .catch((err) => {
+        setOutcome((prev) =>
+          prev && 'results' in prev && prev.query === q
+            ? { ...prev, loadingMore: false, moreFailed: true }
+            : prev,
+        )
+        setToast(rateLimitOrGenericMessage(err, 'Loading more results'))
+      })
+  }, [q, nextPage])
+
+  // Load the next page when the sentinel at the end of the list scrolls into
+  // view. The observer is recreated after every page so that a sentinel that
+  // is still visible (short page, tall viewport) triggers the next load.
+  useEffect(() => {
+    const sentinel = sentinelRef.current
+    if (!canLoadMore || !sentinel || typeof IntersectionObserver === 'undefined') return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) loadMore()
+      },
+      { root: scrollRef.current, rootMargin: '0px 0px 200px 0px' },
+    )
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [canLoadMore, loadMore])
 
   return (
     <div className="h-dvh flex flex-col bg-base-200 overflow-hidden">
@@ -102,6 +174,7 @@ export default function SearchNews() {
 
           {/* Results area */}
           <div
+            ref={scrollRef}
             className="flex-1 overflow-y-auto overscroll-y-contain p-4 lg:p-6"
             onTouchMove={dismissKeyboard}
           >
@@ -117,6 +190,20 @@ export default function SearchNews() {
               results.map((item) => (
                 <SearchNewsItem key={item.id} item={item} onError={showToast} />
               ))
+            )}
+
+            {status === 'done' && loaded && results.length > 0 && (
+              loaded.moreFailed ? (
+                <div className="flex justify-center py-4">
+                  <button type="button" className="btn btn-sm btn-ghost" onClick={loadMore}>
+                    Retry loading more
+                  </button>
+                </div>
+              ) : loaded.hasMore ? (
+                <div ref={sentinelRef} data-testid="load-more-sentinel" className="flex justify-center py-4">
+                  {loaded.loadingMore && <span className="loading loading-spinner loading-sm opacity-50" />}
+                </div>
+              ) : null
             )}
 
             {(status === 'done' || status === 'error') && results.length === 0 && (

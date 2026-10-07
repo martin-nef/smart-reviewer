@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import SearchNews from './SearchNews'
 import searchResults from '../fixtures/search_news.json'
 
@@ -37,10 +37,31 @@ vi.mock('../components/SearchNewsItem', () => ({
 import { apiGet, ApiError } from '../api'
 const mockApiGet = vi.mocked(apiGet)
 
+// jsdom has no IntersectionObserver; capture instances so tests can fire them.
+const observers: { callback: IntersectionObserverCallback; disconnected: boolean }[] = []
+const scrollToEnd = () => {
+  const live = observers.filter((o) => !o.disconnected).at(-1)!
+  act(() => live.callback([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver))
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   debounce.frozen = false
+  observers.length = 0
+  vi.stubGlobal('IntersectionObserver', class {
+    entry = { callback: undefined as unknown as IntersectionObserverCallback, disconnected: false }
+    constructor(cb: IntersectionObserverCallback) {
+      this.entry.callback = cb
+      observers.push(this.entry)
+    }
+    observe() {}
+    unobserve() {}
+    takeRecords() { return [] }
+    disconnect() { this.entry.disconnected = true }
+  })
 })
+
+afterEach(() => vi.unstubAllGlobals())
 
 describe('SearchNews', () => {
   it('renders the search input', () => {
@@ -195,5 +216,83 @@ describe('SearchNews', () => {
     fireEvent.touchMove(screen.getByText('Start typing to search'))
 
     expect(input).not.toHaveFocus()
+  })
+
+  describe('infinite scroll', () => {
+    const page2 = [{ ...searchResults[0], id: 'page2-a', title: 'Page two' }]
+
+    const searchFor = async (value: string) => {
+      render(<SearchNews />)
+      fireEvent.change(screen.getByPlaceholderText('Search news…'), { target: { value } })
+      await waitFor(() => screen.getAllByTestId('news-item'))
+    }
+
+    it('loads the next page when the end of the list is reached', async () => {
+      mockApiGet.mockResolvedValueOnce(searchResults).mockResolvedValueOnce(page2)
+      await searchFor('apple')
+
+      scrollToEnd()
+
+      await waitFor(() =>
+        expect(screen.getAllByTestId('news-item')).toHaveLength(searchResults.length + 1),
+      )
+      expect(mockApiGet).toHaveBeenLastCalledWith(expect.stringContaining('page=2'))
+    })
+
+    it('stops loading once an empty page is returned', async () => {
+      mockApiGet.mockResolvedValueOnce(searchResults).mockResolvedValueOnce([])
+      await searchFor('apple')
+
+      scrollToEnd()
+
+      await waitFor(() => expect(screen.queryByTestId('load-more-sentinel')).not.toBeInTheDocument())
+      expect(screen.getAllByTestId('news-item')).toHaveLength(searchResults.length)
+    })
+
+    it('does not duplicate items already shown', async () => {
+      mockApiGet.mockResolvedValueOnce(searchResults).mockResolvedValueOnce(searchResults)
+      await searchFor('apple')
+
+      scrollToEnd()
+
+      await waitFor(() => expect(mockApiGet).toHaveBeenCalledTimes(2))
+      await waitFor(() => expect(screen.queryByTestId('load-more-sentinel')).toBeInTheDocument())
+      expect(screen.getAllByTestId('news-item')).toHaveLength(searchResults.length)
+    })
+
+    it('offers a retry and toasts when loading more fails', async () => {
+      mockApiGet
+        .mockResolvedValueOnce(searchResults)
+        .mockRejectedValueOnce(new Error('boom'))
+        .mockResolvedValueOnce(page2)
+      await searchFor('apple')
+
+      scrollToEnd()
+      expect(await screen.findByText(/loading more results failed/i)).toBeInTheDocument()
+
+      fireEvent.click(screen.getByText('Retry loading more'))
+
+      await waitFor(() =>
+        expect(screen.getAllByTestId('news-item')).toHaveLength(searchResults.length + 1),
+      )
+    })
+
+    it('ignores a late page from a previous query', async () => {
+      let resolvePage2!: (v: unknown) => void
+      mockApiGet
+        .mockResolvedValueOnce(searchResults)
+        .mockReturnValueOnce(new Promise((r) => { resolvePage2 = r }))
+        .mockResolvedValueOnce([])
+      await searchFor('apple')
+
+      scrollToEnd()
+      fireEvent.change(screen.getByPlaceholderText('Search news…'), { target: { value: 'banana' } })
+      await screen.findByText('No results found')
+
+      await act(async () => resolvePage2(page2))
+
+      expect(screen.getByText('No results found')).toBeInTheDocument()
+      expect(screen.queryByTestId('news-item')).not.toBeInTheDocument()
+    })
   })
 })
