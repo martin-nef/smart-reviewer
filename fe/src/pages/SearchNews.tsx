@@ -62,7 +62,7 @@ export default function SearchNews() {
   const results = current && 'results' in current ? current.results : []
 
   return (
-    <div className="h-screen flex flex-col bg-base-200 overflow-hidden">
+    <div className="h-dvh flex flex-col bg-base-200 overflow-hidden">
       <div className="w-full max-w-2xl mx-auto flex flex-col h-full p-4 lg:py-8">
         {/* Island card on wider screens */}
         <div className="flex flex-col h-full lg:bg-base-100 lg:rounded-2xl lg:shadow-xl lg:border lg:border-base-300 overflow-hidden">
