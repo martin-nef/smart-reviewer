@@ -1,2 +1,12 @@
 @import "tailwindcss";
 @plugin "daisyui/index.js";
+
+/* Lock the document so only the results list scrolls; otherwise the mobile
+   keyboard makes the page scroll too, giving a double scrollbar. */
+html,
+body,
+#root {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
