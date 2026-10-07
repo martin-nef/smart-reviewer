@@ -1,0 +1,30 @@
+# Keep the build context (and the `COPY . .` layer's cache key) free of files
+# the production image never uses.
+.git
+.github
+.gitignore
+.dockerignore
+Dockerfile
+
+# Local environment files (may hold secrets); only the sample is tracked.
+.env*
+
+# Logs, temp files and local state.
+log/*
+!log/.keep
+tmp/*
+!tmp/.keep
+storage/*
+!storage/.keep
+.bundle
+vendor/bundle
+.ruby-lsp
+.vscode
+
+# Dev/test tooling, not needed at runtime (BUNDLE_WITHOUT=development:test).
+spec
+sorbet
+.rspec
+.rubocop.yml
+Makefile
+README.md

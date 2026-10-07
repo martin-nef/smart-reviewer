@@ -13,10 +13,35 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build-and-push:
+  # Work out which containers this push (or labeled PR) touched. Only those are
+  # built and re-pinned; the others keep their currently deployed image.
+  changes:
     if: >
       github.event_name == 'push' || (github.event_name == 'pull_request' &&
       github.event.label.name == 'build')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      containers: ${{ steps.filter.outputs.changes }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            be:
+              - 'be/**'
+              - '.github/workflows/docker-publish.yml'
+            fe:
+              - 'fe/**'
+              - '.github/workflows/docker-publish.yml'
+
+  build-and-push:
+    needs: changes
+    if: needs.changes.outputs.containers != '[]'
     runs-on: ubuntu-latest
 
     permissions:
@@ -26,7 +51,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        container: [ fe, be ]
+        container: ${{ fromJSON(needs.changes.outputs.containers) }}
     steps:
       - uses: actions/checkout@v4
 
@@ -43,6 +68,9 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # The registry cache lives next to the images; mode=max also caches the
+      # intermediate build stage (apt + bundle install / npm install) so that
+      # a rebuild after a code-only change skips them on both architectures.
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
@@ -52,13 +80,15 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}:${{ github.sha }}-${{matrix.container}}
             ${{ github.event_name == 'push' && format('ghcr.io/{0}:latest-{1}', github.repository, matrix.container) || '' }}
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}:buildcache-${{ matrix.container }}
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository }}:buildcache-${{ matrix.container }},mode=max,image-manifest=true,oci-mediatypes=true
 
-  # Trunk deploy: pin the deploy manifests to the freshly built image SHA and
-  # commit back to main. Flux's GitRepository (1m poll) picks up the commit and
-  # rolls the Deployment. The GITHUB_TOKEN push does not retrigger workflows, and
-  # "[skip ci]" guards against any future loop.
+  # Trunk deploy: pin the deploy manifests of the containers just built to this
+  # SHA and commit back to main. Flux's GitRepository (1m poll) picks up the
+  # commit and rolls the Deployments. The GITHUB_TOKEN push does not retrigger
+  # workflows, and "[skip ci]" guards against any future loop.
   bump-manifests:
-    needs: build-and-push
+    needs: [ changes, build-and-push ]
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
@@ -68,11 +98,14 @@ jobs:
         with:
           ref: main
 
-      - name: Pin deploy manifests to ${{ github.sha }}
+      - name: Pin built images to ${{ github.sha }}
+        env:
+          CONTAINERS: ${{ needs.changes.outputs.containers }}
         run: |
           repo="ghcr.io/${{ github.repository }}"
-          sed -i -E "s#(image: ${repo}):.*-be\$#\1:${{ github.sha }}-be#" deploy/deployment-be.yaml
-          sed -i -E "s#(image: ${repo}):.*-fe\$#\1:${{ github.sha }}-fe#" deploy/deployment-fe.yaml
+          for container in $(jq -r '.[]' <<< "$CONTAINERS"); do
+            sed -i -E "s#(image: ${repo}):.*-${container}\$#\1:${{ github.sha }}-${container}#" "deploy/deployment-${container}.yaml"
+          done
 
       - name: Commit and push
         run: |
