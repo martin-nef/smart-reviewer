@@ -3,11 +3,27 @@ import SearchNews from './SearchNews'
 import searchResults from '../fixtures/search_news.json'
 
 // Bypass debounce so tests react immediately to input changes
-vi.mock('../hooks/useDebounce', () => ({
-  useDebounce: <T,>(value: T) => value,
-}))
+// (set `debounce.frozen` to simulate the delay not having elapsed yet)
+const debounce = vi.hoisted(() => ({ frozen: false }))
+vi.mock('../hooks/useDebounce', async () => {
+  const { useRef } = await import('react')
+  return {
+    useDebounce: <T,>(value: T) => {
+      const ref = useRef(value)
+      if (!debounce.frozen) ref.current = value
+      return ref.current
+    },
+  }
+})
 
 vi.mock('../api', () => ({
+  ApiError: class ApiError extends Error {
+    status: number
+    constructor(status: number, message: string) {
+      super(message)
+      this.status = status
+    }
+  },
   apiGet: vi.fn(),
   apiPost: vi.fn(),
 }))
@@ -18,10 +34,13 @@ vi.mock('../components/SearchNewsItem', () => ({
   ),
 }))
 
-import { apiGet } from '../api'
+import { apiGet, ApiError } from '../api'
 const mockApiGet = vi.mocked(apiGet)
 
-beforeEach(() => vi.clearAllMocks())
+beforeEach(() => {
+  vi.clearAllMocks()
+  debounce.frozen = false
+})
 
 describe('SearchNews', () => {
   it('renders the search input', () => {
@@ -45,6 +64,16 @@ describe('SearchNews', () => {
     resolve!(searchResults)
   })
 
+  it('shows skeleton while typing, before the debounced search runs', () => {
+    debounce.frozen = true
+
+    render(<SearchNews />)
+    fireEvent.change(screen.getByPlaceholderText('Search news…'), { target: { value: 'ap' } })
+
+    expect(screen.getByTestId('skeleton-list')).toBeInTheDocument()
+    expect(mockApiGet).not.toHaveBeenCalled()
+  })
+
   it('shows results after successful search', async () => {
     mockApiGet.mockResolvedValue(searchResults)
 
@@ -64,6 +93,17 @@ describe('SearchNews', () => {
 
     await waitFor(() => {
       expect(screen.getByText('No results found')).toBeInTheDocument()
+    })
+  })
+
+  it('shows rate limit toast on 429', async () => {
+    mockApiGet.mockRejectedValue(new ApiError(429, 'HTTP 429'))
+
+    render(<SearchNews />)
+    fireEvent.change(screen.getByPlaceholderText('Search news…'), { target: { value: 'fail' } })
+
+    await waitFor(() => {
+      expect(screen.getByText(/rate limit/i)).toBeInTheDocument()
     })
   })
 

@@ -1,6 +1,15 @@
 
 import { API_URL } from './config'
 
+export class ApiError extends Error {
+  status: number
+
+  constructor(status: number, message: string) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+  }
+}
 
 // Usage example:
 //   const reviews = await api<Review[]>('/reviews')
@@ -13,7 +22,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
       ...init?.headers,
     },
   })
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  if (!res.ok) throw new ApiError(res.status, `HTTP ${res.status}`)
   return res.json()
 }
 
