@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: be
-          image: ghcr.io/martin-nef/smart-reviewer:fbec36572089ba4d360a550029941533b0b94650-be
+          image: ghcr.io/martin-nef/smart-reviewer:b4194bbdf8c563ee564485192b21e4f028ad59bf-be
           ports:
             - containerPort: 3000
           env:
