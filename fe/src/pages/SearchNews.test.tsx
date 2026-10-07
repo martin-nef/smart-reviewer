@@ -176,4 +176,24 @@ describe('SearchNews', () => {
       expect(screen.getByText('No results found')).toBeInTheDocument()
     })
   })
+
+  it('closes the keyboard when Enter is pressed', () => {
+    render(<SearchNews />)
+    const input = screen.getByPlaceholderText('Search news…')
+    input.focus()
+
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    expect(input).not.toHaveFocus()
+  })
+
+  it('closes the keyboard when the results are dragged', () => {
+    render(<SearchNews />)
+    const input = screen.getByPlaceholderText('Search news…')
+    input.focus()
+
+    fireEvent.touchMove(screen.getByText('Start typing to search'))
+
+    expect(input).not.toHaveFocus()
+  })
 })
