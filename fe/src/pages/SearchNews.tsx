@@ -7,50 +7,53 @@ import type { NewsItem } from '../types'
 
 type Status = 'idle' | 'loading' | 'done' | 'error'
 
+// The outcome of one search, tagged with the query that produced it so that
+// status/results can be derived during render instead of synced via effects.
+type Outcome =
+  | { query: string; results: NewsItem[] }
+  | { query: string; error: true }
+
 export default function SearchNews() {
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState<NewsItem[]>([])
-  const [status, setStatus] = useState<Status>('idle')
+  const [outcome, setOutcome] = useState<Outcome | null>(null)
   const [toast, setToast] = useState<string | null>(null)
 
   const debouncedQuery = useDebounce(query, 300)
+  const q = debouncedQuery.trim()
 
   const showToast = useCallback((msg: string) => setToast(msg), [])
 
   useEffect(() => {
-    const q = debouncedQuery.trim()
-    if (!q) {
-      // TODO: use a library for debouncing to avoid state in effect 
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setResults([])
-      setStatus('idle')
-      return
-    }
+    if (!q) return
 
     let cancelled = false
-    setStatus('loading')
 
     apiGet<NewsItem[]>(`/search_news?query=${encodeURIComponent(q)}`)
-      .then((data) => {
-        if (!cancelled) {
-          setResults(data)
-          setStatus('done')
-        }
+      .then((results) => {
+        if (!cancelled) setOutcome({ query: q, results })
       })
       .catch((err) => {
-        if (!cancelled) {
-          setToast(
-            err instanceof ApiError && err.status === 429
-              ? 'Search failed: the news API rate limit was reached. Please wait a moment and try again.'
-              : 'Search failed. Please try again.',
-          )
-          setResults([])
-          setStatus('error')
-        }
+        if (cancelled) return
+        setOutcome({ query: q, error: true })
+        setToast(
+          err instanceof ApiError && err.status === 429
+            ? 'Search failed: the news API rate limit was reached. Please wait a moment and try again.'
+            : 'Search failed. Please try again.',
+        )
       })
 
     return () => { cancelled = true }
-  }, [debouncedQuery])
+  }, [q])
+
+  const current = outcome?.query === q ? outcome : null
+  const status: Status = !q
+    ? 'idle'
+    : !current
+      ? 'loading'
+      : 'error' in current
+        ? 'error'
+        : 'done'
+  const results = current && 'results' in current ? current.results : []
 
   return (
     <div className="h-screen flex flex-col bg-base-200 overflow-hidden">
