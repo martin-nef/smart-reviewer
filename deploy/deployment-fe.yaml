@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: fe
-          image: ghcr.io/martin-nef/smart-reviewer:c42d327c91eff5f4d14579cb3e03ea6580a1e4af-fe
+          image: ghcr.io/martin-nef/smart-reviewer:ad05fb1adf0cfda7721abfb47427144ad5c778f0-fe
           ports:
             - containerPort: 80
           env:
