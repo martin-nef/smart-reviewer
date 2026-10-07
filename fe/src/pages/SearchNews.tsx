@@ -104,7 +104,7 @@ export default function SearchNews() {
             )}
 
             {(status === 'done' || status === 'error') && results.length === 0 && (
-              <div className="flex flex-col items-center justify-center h-full gap-2 text-base-content/40 py-16">
+              <div className="flex flex-col items-center justify-center min-h-full gap-2 text-base-content/40">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
@@ -113,7 +113,7 @@ export default function SearchNews() {
             )}
 
             {status === 'idle' && (
-              <div className="flex flex-col items-center justify-center h-full gap-2 text-base-content/30 py-16">
+              <div className="flex flex-col items-center justify-center min-h-full gap-2 text-base-content/30">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
                 </svg>
