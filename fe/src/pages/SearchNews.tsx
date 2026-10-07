@@ -5,6 +5,9 @@ import SearchNewsItem from '../components/SearchNewsItem'
 import Toast from '../components/Toast'
 import type { NewsItem } from '../types'
 
+// Long enough to avoid hammering the rate-limited news API on every pause.
+const SEARCH_DEBOUNCE_MS = 800
+
 type Status = 'idle' | 'loading' | 'done' | 'error'
 
 // The outcome of one search, tagged with the query that produced it so that
@@ -18,7 +21,7 @@ export default function SearchNews() {
   const [outcome, setOutcome] = useState<Outcome | null>(null)
   const [toast, setToast] = useState<string | null>(null)
 
-  const debouncedQuery = useDebounce(query, 300)
+  const debouncedQuery = useDebounce(query, SEARCH_DEBOUNCE_MS)
   const q = debouncedQuery.trim()
   // Typing ahead of the debounced query counts as loading, so the UI reacts
   // immediately instead of waiting for the debounce to fire.
