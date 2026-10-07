@@ -29,9 +29,10 @@ jobs:
         container: [ fe, be ]
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        with:
+          # Full history so we can diff against the commit the deployed image
+          # was built from.
+          fetch-depth: 0
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
@@ -43,7 +44,55 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # The deploy manifest pins the image that is currently live, tagged with
+      # the commit it was built from. If nothing under <container>/ changed
+      # since that commit, the image is identical, so retag it instead of
+      # rebuilding. Any doubt (no pin, unknown commit, missing image) falls
+      # through to a normal build.
+      - name: Check whether ${{ matrix.container }} needs a rebuild
+        id: plan
+        env:
+          CONTAINER: ${{ matrix.container }}
+          IMAGE: ghcr.io/${{ github.repository }}
+        run: |
+          pinned=$(sed -nE "s#^[[:space:]]*image: ${IMAGE}:([0-9a-f]{40})-${CONTAINER}\$#\1#p" "deploy/deployment-${CONTAINER}.yaml")
+          source="${IMAGE}:${pinned}-${CONTAINER}"
+          if [ -z "$pinned" ]; then
+            echo "No pinned ${CONTAINER} image in the manifest; building."
+          elif ! git cat-file -e "${pinned}^{commit}" 2>/dev/null; then
+            echo "Pinned commit ${pinned} not in history; building."
+          elif ! git diff --quiet "$pinned" HEAD -- "$CONTAINER"; then
+            echo "${CONTAINER}/ changed since ${pinned}; building."
+          elif ! docker buildx imagetools inspect "$source" >/dev/null 2>&1; then
+            echo "${source} not found in the registry; building."
+          else
+            echo "${CONTAINER}/ unchanged since ${pinned}; reusing ${source}."
+            echo "reuse=${source}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Retag unchanged ${{ matrix.container }} image
+        if: steps.plan.outputs.reuse != ''
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}
+          CONTAINER: ${{ matrix.container }}
+          REUSE: ${{ steps.plan.outputs.reuse }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          tags=(-t "${IMAGE}:${GITHUB_SHA}-${CONTAINER}")
+          if [ "$EVENT" = push ]; then
+            tags+=(-t "${IMAGE}:latest-${CONTAINER}")
+          fi
+          docker buildx imagetools create "${tags[@]}" "$REUSE"
+
+      - name: Set up QEMU
+        if: steps.plan.outputs.reuse == ''
+        uses: docker/setup-qemu-action@v3
+
+      # The registry cache lives next to the images; mode=max also caches the
+      # intermediate build stage (apt + bundle install / npm install) so that
+      # a rebuild after a code-only change skips them on both architectures.
       - name: Build and push
+        if: steps.plan.outputs.reuse == ''
         uses: docker/build-push-action@v6
         with:
           context: ./${{ matrix.container }}
@@ -52,6 +101,8 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}:${{ github.sha }}-${{matrix.container}}
             ${{ github.event_name == 'push' && format('ghcr.io/{0}:latest-{1}', github.repository, matrix.container) || '' }}
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}:buildcache-${{ matrix.container }}
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository }}:buildcache-${{ matrix.container }},mode=max,image-manifest=true,oci-mediatypes=true
 
   # Trunk deploy: pin the deploy manifests to the freshly built image SHA and
   # commit back to main. Flux's GitRepository (1m poll) picks up the commit and
