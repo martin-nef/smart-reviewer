@@ -8,6 +8,13 @@ vi.mock('../hooks/useDebounce', () => ({
 }))
 
 vi.mock('../api', () => ({
+  ApiError: class ApiError extends Error {
+    status: number
+    constructor(status: number, message: string) {
+      super(message)
+      this.status = status
+    }
+  },
   apiGet: vi.fn(),
   apiPost: vi.fn(),
 }))
@@ -18,7 +25,7 @@ vi.mock('../components/SearchNewsItem', () => ({
   ),
 }))
 
-import { apiGet } from '../api'
+import { apiGet, ApiError } from '../api'
 const mockApiGet = vi.mocked(apiGet)
 
 beforeEach(() => vi.clearAllMocks())
@@ -64,6 +71,17 @@ describe('SearchNews', () => {
 
     await waitFor(() => {
       expect(screen.getByText('No results found')).toBeInTheDocument()
+    })
+  })
+
+  it('shows rate limit toast on 429', async () => {
+    mockApiGet.mockRejectedValue(new ApiError(429, 'HTTP 429'))
+
+    render(<SearchNews />)
+    fireEvent.change(screen.getByPlaceholderText('Search news…'), { target: { value: 'fail' } })
+
+    await waitFor(() => {
+      expect(screen.getByText(/rate limit/i)).toBeInTheDocument()
     })
   })
 

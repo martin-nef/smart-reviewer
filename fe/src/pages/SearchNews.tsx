@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { apiGet } from '../api'
+import { apiGet, ApiError } from '../api'
 import { useDebounce } from '../hooks/useDebounce'
 import SearchNewsItem from '../components/SearchNewsItem'
 import Toast from '../components/Toast'
@@ -37,9 +37,13 @@ export default function SearchNews() {
           setStatus('done')
         }
       })
-      .catch(() => {
+      .catch((err) => {
         if (!cancelled) {
-          setToast('Search failed. Please try again.')
+          setToast(
+            err instanceof ApiError && err.status === 429
+              ? 'Search failed: the news API rate limit was reached. Please wait a moment and try again.'
+              : 'Search failed. Please try again.',
+          )
           setResults([])
           setStatus('error')
         }
