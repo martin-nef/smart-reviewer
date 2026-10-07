@@ -13,7 +13,13 @@ RSpec.configure do |config|
   config.filter_rails_from_backtrace!
   config.include(FactoryBot::Syntax::Methods)
 
-  config.after(:each) do
+  config.before(:suite) do
     Mongoid.purge!
+    Mongoid.models.each(&:create_indexes)
+  end
+
+  # truncate! keeps indexes, unlike purge!, so unique indexes stay enforced.
+  config.after(:each) do
+    Mongoid.truncate!
   end
 end

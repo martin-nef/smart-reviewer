@@ -28,4 +28,13 @@ RSpec.describe(News) do
       expect(news.sentiment).to(be_a(String))
     end
   end
+
+  describe "indexes" do
+    it "rejects two news with the same url at the database level" do
+      create(:news, url: "https://example.com/dup")
+
+      expect { build(:news, url: "https://example.com/dup").save!(validate: false) }
+        .to(raise_error(Mongo::Error::OperationFailure, /E11000/))
+    end
+  end
 end

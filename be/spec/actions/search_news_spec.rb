@@ -54,24 +54,102 @@ RSpec.describe(Actions::SearchNews) do
   describe "#persist_articles" do
     let(:articles) { JSON.parse(fixture_json)["articles"] }
 
-    it "creates News records associated with the given search" do
+    it "creates News records and links them to the search" do
       expect { action.persist_articles(articles) }.to(change(News, :count).by(10))
+      expect(search.reload.news.count).to(eq(10))
     end
 
-    it "associates all News records with the search" do
-      news_list = action.persist_articles(articles)
-      expect(news_list.map(&:search_id).uniq).to(eq([search.id]))
+    it "stamps the search as fetched" do
+      expect { action.persist_articles(articles) }.to(change { search.reload.fetched_at }.from(nil))
+    end
+
+    it "reuses existing News with the same url instead of duplicating" do
+      existing = create(:news, url: articles.first["url"], summary: "kept")
+
+      expect { action.persist_articles(articles) }.to(change(News, :count).by(9))
+      expect(search.reload.news).to(include(existing))
+      expect(existing.reload.summary).to(eq("kept"))
+    end
+
+    it "falls back to the existing record when a concurrent insert wins the race" do
+      winner = create(:news, url: articles.first["url"])
+      error = Mongo::Error::OperationFailure.new("E11000 duplicate key", nil, code: 11_000)
+      allow(News).to(receive(:find_or_create_by!).and_wrap_original do |original, attrs, &block|
+        attrs[:url] == winner.url ? raise(error) : original.call(attrs, &block)
+      end)
+
+      action.persist_articles(articles)
+
+      expect(search.reload.news).to(include(winner))
+      expect(News.where(url: winner.url).count).to(eq(1))
+    end
+
+    it "re-raises other database errors" do
+      allow(News).to(receive(:find_or_create_by!).and_raise(Mongo::Error::OperationFailure.new("boom", nil, code: 1)))
+
+      expect { action.persist_articles(articles) }.to(raise_error(Mongo::Error::OperationFailure))
+    end
+
+    it "shares news between searches that return the same articles" do
+      other = create(:search, query: "rails")
+      action.persist_articles(articles)
+      described_class.new(other).persist_articles(articles)
+
+      expect(News.count).to(eq(10))
+      expect(other.reload.news.map(&:id)).to(match_array(search.reload.news.map(&:id)))
     end
   end
 
   describe "#call" do
     let(:ok_response) { double(code: "200", body: fixture_json, message: "OK") }
 
-    it "returns cached news without hitting the API when the search already has news" do
-      existing = create_list(:news, 2, search: search)
+    it "returns cached news without hitting the API when the search was fetched today" do
+      existing = create_list(:news, 2)
+      search.update!(news: existing, fetched_at: Time.current)
       expect(Net::HTTP).not_to(receive(:get_response))
 
       expect(action.call.to_a).to(match_array(existing))
+    end
+
+    it "does not hit the API again after a refresh" do
+      allow(Net::HTTP).to(receive(:get_response).and_return(ok_response))
+      search.update!(fetched_at: 1.day.ago)
+
+      2.times { described_class.new(search.reload).call }
+
+      expect(Net::HTTP).to(have_received(:get_response).once)
+    end
+
+    context "when the search was last fetched before today" do
+      before do
+        search.update!(news: create_list(:news, 2), fetched_at: 1.day.ago)
+        allow(Net::HTTP).to(receive(:get_response).and_return(ok_response))
+      end
+
+      it "refetches from GNews and updates fetched_at" do
+        action.call
+
+        expect(Net::HTTP).to(have_received(:get_response).once)
+        expect(search.reload.fetched_at).to(be_today)
+      end
+
+      it "replaces the search's news with the fresh results" do
+        expect(action.call.count).to(eq(10))
+      end
+
+      it "does not duplicate news on repeated refreshes" do
+        action.call
+        search.update!(fetched_at: 1.day.ago)
+
+        expect { described_class.new(search.reload).call }.not_to(change(News, :count))
+      end
+    end
+
+    it "does not touch fetched_at when GNews fails" do
+      allow(Net::HTTP).to(receive(:get_response).and_return(double(code: "503", message: "x", body: "")))
+
+      expect { action.call }.to(raise_error(Actions::SearchNews::UpstreamError))
+      expect(search.reload.fetched_at).to(be_nil)
     end
 
     it "fetches articles from GNews and persists them under the search" do

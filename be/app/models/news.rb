@@ -3,7 +3,7 @@
 class News
   include Mongoid::Document
 
-  belongs_to :search, optional: true
+  index({ url: 1 }, { unique: true })
 
   field :title, type: String
   field :url, type: String
