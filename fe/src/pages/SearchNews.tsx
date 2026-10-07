@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { apiGet, ApiError } from '../api'
 import { useDebounce } from '../hooks/useDebounce'
 import SearchNewsItem from '../components/SearchNewsItem'
@@ -20,6 +20,7 @@ export default function SearchNews() {
   const [query, setQuery] = useState('')
   const [outcome, setOutcome] = useState<Outcome | null>(null)
   const [toast, setToast] = useState<string | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   const debouncedQuery = useDebounce(query, SEARCH_DEBOUNCE_MS)
   const q = debouncedQuery.trim()
@@ -28,6 +29,13 @@ export default function SearchNews() {
   const typing = query.trim() !== q
 
   const showToast = useCallback((msg: string) => setToast(msg), [])
+
+  // Like iOS's keyboardDismissMode = .onDrag: dragging the results closes the
+  // keyboard instead of resizing the layout around it, so there is only ever
+  // one thing to scroll and nothing reflows.
+  const dismissKeyboard = () => {
+    if (document.activeElement === inputRef.current) inputRef.current?.blur()
+  }
 
   useEffect(() => {
     if (!q) return
@@ -74,11 +82,16 @@ export default function SearchNews() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
               </svg>
               <input
+                ref={inputRef}
                 type="search"
+                enterKeyHint="search"
                 className="grow"
                 placeholder="Search news…"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.nativeEvent.isComposing) e.currentTarget.blur()
+                }}
                 autoFocus
               />
               {status === 'loading' && (
@@ -88,7 +101,10 @@ export default function SearchNews() {
           </div>
 
           {/* Results area */}
-          <div className="flex-1 overflow-y-auto p-4 lg:p-6">
+          <div
+            className="flex-1 overflow-y-auto overscroll-y-contain p-4 lg:p-6"
+            onTouchMove={dismissKeyboard}
+          >
             {status === 'loading' && (
               <div data-testid="skeleton-list">
                 {Array.from({ length: 5 }).map((_, i) => (
@@ -104,7 +120,7 @@ export default function SearchNews() {
             )}
 
             {(status === 'done' || status === 'error') && results.length === 0 && (
-              <div className="flex flex-col items-center justify-center h-full gap-2 text-base-content/40 py-16">
+              <div className="flex flex-col items-center justify-center min-h-full gap-2 text-base-content/40">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
@@ -113,7 +129,7 @@ export default function SearchNews() {
             )}
 
             {status === 'idle' && (
-              <div className="flex flex-col items-center justify-center h-full gap-2 text-base-content/30 py-16">
+              <div className="flex flex-col items-center justify-center min-h-full gap-2 text-base-content/30">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
                 </svg>
