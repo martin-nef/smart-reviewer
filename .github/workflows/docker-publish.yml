@@ -13,10 +13,35 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build-and-push:
+  # Work out which containers this push (or labeled PR) touched. Only those are
+  # built and re-pinned; the others keep their currently deployed image.
+  changes:
     if: >
       github.event_name == 'push' || (github.event_name == 'pull_request' &&
       github.event.label.name == 'build')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      containers: ${{ steps.filter.outputs.changes }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            be:
+              - 'be/**'
+              - '.github/workflows/docker-publish.yml'
+            fe:
+              - 'fe/**'
+              - '.github/workflows/docker-publish.yml'
+
+  build-and-push:
+    needs: changes
+    if: needs.changes.outputs.containers != '[]'
     runs-on: ubuntu-latest
 
     permissions:
@@ -26,13 +51,12 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        container: [ fe, be ]
+        container: ${{ fromJSON(needs.changes.outputs.containers) }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          # Full history so we can diff against the commit the deployed image
-          # was built from.
-          fetch-depth: 0
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
@@ -44,42 +68,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # The deploy manifest pins the image that is currently live, tagged with
-      # the commit it was built from. If nothing under <container>/ changed
-      # since that commit, that image is still current, so skip the build and
-      # leave the pin alone (bump-manifests only bumps what was built). Any
-      # doubt (no pin, unknown commit, missing image) falls through to a
-      # normal build.
-      - name: Check whether ${{ matrix.container }} needs a rebuild
-        id: plan
-        env:
-          CONTAINER: ${{ matrix.container }}
-          IMAGE: ghcr.io/${{ github.repository }}
-        run: |
-          pinned=$(sed -nE "s#^[[:space:]]*image: ${IMAGE}:([0-9a-f]{40})-${CONTAINER}\$#\1#p" "deploy/deployment-${CONTAINER}.yaml")
-          current="${IMAGE}:${pinned}-${CONTAINER}"
-          if [ -z "$pinned" ]; then
-            echo "No pinned ${CONTAINER} image in the manifest; building."
-          elif ! git cat-file -e "${pinned}^{commit}" 2>/dev/null; then
-            echo "Pinned commit ${pinned} not in history; building."
-          elif ! git diff --quiet "$pinned" HEAD -- "$CONTAINER"; then
-            echo "${CONTAINER}/ changed since ${pinned}; building."
-          elif ! docker buildx imagetools inspect "$current" >/dev/null 2>&1; then
-            echo "${current} not found in the registry; building."
-          else
-            echo "${CONTAINER}/ unchanged since ${pinned}; skipping build, ${current} stays deployed."
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Set up QEMU
-        if: steps.plan.outputs.skip != 'true'
-        uses: docker/setup-qemu-action@v3
-
       # The registry cache lives next to the images; mode=max also caches the
       # intermediate build stage (apt + bundle install / npm install) so that
       # a rebuild after a code-only change skips them on both architectures.
       - name: Build and push
-        if: steps.plan.outputs.skip != 'true'
         uses: docker/build-push-action@v6
         with:
           context: ./${{ matrix.container }}
@@ -91,50 +83,34 @@ jobs:
           cache-from: type=registry,ref=ghcr.io/${{ github.repository }}:buildcache-${{ matrix.container }}
           cache-to: type=registry,ref=ghcr.io/${{ github.repository }}:buildcache-${{ matrix.container }},mode=max,image-manifest=true,oci-mediatypes=true
 
-  # Trunk deploy: pin the deploy manifests to the freshly built image SHA and
-  # commit back to main. Flux's GitRepository (1m poll) picks up the commit and
-  # rolls the Deployment. The GITHUB_TOKEN push does not retrigger workflows, and
-  # "[skip ci]" guards against any future loop.
-  #
-  # Only containers that were actually built for this commit are bumped: a
-  # container whose build was skipped has no <sha>-<container> image, and its
-  # manifest keeps pointing at the image that is already deployed.
+  # Trunk deploy: pin the deploy manifests of the containers just built to this
+  # SHA and commit back to main. Flux's GitRepository (1m poll) picks up the
+  # commit and rolls the Deployments. The GITHUB_TOKEN push does not retrigger
+  # workflows, and "[skip ci]" guards against any future loop.
   bump-manifests:
-    needs: build-and-push
+    needs: [ changes, build-and-push ]
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      packages: read
     steps:
       - uses: actions/checkout@v4
         with:
           ref: main
 
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Pin built images in deploy manifests to ${{ github.sha }}
+      - name: Pin built images to ${{ github.sha }}
+        env:
+          CONTAINERS: ${{ needs.changes.outputs.containers }}
         run: |
           repo="ghcr.io/${{ github.repository }}"
-          for container in be fe; do
-            image="${repo}:${{ github.sha }}-${container}"
-            if docker buildx imagetools inspect "$image" >/dev/null 2>&1; then
-              echo "Pinning ${container} to ${{ github.sha }}."
-              sed -i -E "s#(image: ${repo}):.*-${container}\$#\1:${{ github.sha }}-${container}#" "deploy/deployment-${container}.yaml"
-            else
-              echo "No ${container} image built for ${{ github.sha }}; leaving its pin unchanged."
-            fi
+          for container in $(jq -r '.[]' <<< "$CONTAINERS"); do
+            sed -i -E "s#(image: ${repo}):.*-${container}\$#\1:${{ github.sha }}-${container}#" "deploy/deployment-${container}.yaml"
           done
 
       - name: Commit and push
         run: |
           if git diff --quiet -- deploy; then
-            echo "No manifest changes to commit."
+            echo "Manifests already pinned to ${{ github.sha }}; nothing to do."
             exit 0
           fi
           git config user.name "github-actions[bot]"
