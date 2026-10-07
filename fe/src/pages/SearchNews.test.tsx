@@ -3,9 +3,18 @@ import SearchNews from './SearchNews'
 import searchResults from '../fixtures/search_news.json'
 
 // Bypass debounce so tests react immediately to input changes
-vi.mock('../hooks/useDebounce', () => ({
-  useDebounce: <T,>(value: T) => value,
-}))
+// (set `debounce.frozen` to simulate the delay not having elapsed yet)
+const debounce = vi.hoisted(() => ({ frozen: false }))
+vi.mock('../hooks/useDebounce', async () => {
+  const { useRef } = await import('react')
+  return {
+    useDebounce: <T,>(value: T) => {
+      const ref = useRef(value)
+      if (!debounce.frozen) ref.current = value
+      return ref.current
+    },
+  }
+})
 
 vi.mock('../api', () => ({
   ApiError: class ApiError extends Error {
@@ -28,7 +37,10 @@ vi.mock('../components/SearchNewsItem', () => ({
 import { apiGet, ApiError } from '../api'
 const mockApiGet = vi.mocked(apiGet)
 
-beforeEach(() => vi.clearAllMocks())
+beforeEach(() => {
+  vi.clearAllMocks()
+  debounce.frozen = false
+})
 
 describe('SearchNews', () => {
   it('renders the search input', () => {
@@ -50,6 +62,16 @@ describe('SearchNews', () => {
 
     expect(await screen.findByTestId('skeleton-list')).toBeInTheDocument()
     resolve!(searchResults)
+  })
+
+  it('shows skeleton while typing, before the debounced search runs', () => {
+    debounce.frozen = true
+
+    render(<SearchNews />)
+    fireEvent.change(screen.getByPlaceholderText('Search news…'), { target: { value: 'ap' } })
+
+    expect(screen.getByTestId('skeleton-list')).toBeInTheDocument()
+    expect(mockApiGet).not.toHaveBeenCalled()
   })
 
   it('shows results after successful search', async () => {

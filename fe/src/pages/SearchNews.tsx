@@ -20,6 +20,9 @@ export default function SearchNews() {
 
   const debouncedQuery = useDebounce(query, 300)
   const q = debouncedQuery.trim()
+  // Typing ahead of the debounced query counts as loading, so the UI reacts
+  // immediately instead of waiting for the debounce to fire.
+  const typing = query.trim() !== q
 
   const showToast = useCallback((msg: string) => setToast(msg), [])
 
@@ -46,9 +49,9 @@ export default function SearchNews() {
   }, [q])
 
   const current = outcome?.query === q ? outcome : null
-  const status: Status = !q
+  const status: Status = !query.trim()
     ? 'idle'
-    : !current
+    : typing || !current
       ? 'loading'
       : 'error' in current
         ? 'error'
