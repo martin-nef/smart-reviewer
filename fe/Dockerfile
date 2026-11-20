@@ -30,4 +30,12 @@ INNER
 EOF
 RUN chmod +x /docker-entrypoint.d/99-env.sh
 
+# Run as the image's nginx user (101) instead of root: no master process as
+# root, pid file and caches somewhere it can write, and the html dir writable
+# for env.js. Binding port 80 unprivileged works because containerd (2.x) and
+# Docker set net.ipv4.ip_unprivileged_port_start=0 in the container.
+RUN sed -i -e '/^user /d' -e 's,^pid .*;,pid /tmp/nginx.pid;,' /etc/nginx/nginx.conf \
+    && chown -R nginx:nginx /var/cache/nginx /usr/share/nginx/html
+USER 101
+
 EXPOSE 80
