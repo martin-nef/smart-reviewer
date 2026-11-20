@@ -12,7 +12,7 @@ docker-compose up
 Prerequisites
 
 - NodeJS 25 - for frontend
-- Ruby 3.4.8 - for backend
+- Ruby 3.4.13 - for backend
 - Docker - for mongo
 
 Run make - it'll install deps, spin up mongodb, and start both the frontend and backend servers
