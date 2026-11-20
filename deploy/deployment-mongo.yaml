@@ -25,7 +25,11 @@ spec:
           type: RuntimeDefault
       containers:
         - name: mongo
-          image: mongo:9
+          # Not 8.x/9.x: since 8.0.21 they refuse to start on kernels 6.19+,
+          # and the nodes' Ubuntu kernel reports 7.0.0 so the 7.0.14+ exemption
+          # never matches (SERVER-125742, SERVER-136848). 7.0 is unaffected and
+          # is what CI tests against.
+          image: mongo:7.0
           ports:
             - containerPort: 27017
           securityContext:
