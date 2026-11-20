@@ -13,11 +13,23 @@ spec:
       labels:
         app: smart-reviewer-fe
     spec:
+      # The image's nginx user (fe/Dockerfile), with no way to gain
+      # privileges back.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        runAsGroup: 101
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: fe
           image: ghcr.io/martin-nef/smart-reviewer:853e42cde88d16425d2f9da1e7493a8366399a08-fe
           ports:
             - containerPort: 80
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           env:
             - name: API_URL
               value: "https://smart-reviewer-api.nefcloud.top"
