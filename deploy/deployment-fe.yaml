@@ -23,7 +23,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: fe
-          image: ghcr.io/martin-nef/smart-reviewer:8d4e80f0c769bcd53f08cd7ff54957f63b2a78ca-fe
+          image: ghcr.io/martin-nef/smart-reviewer:7cf8e519531e25d92c4bb47ca60d915a2ea90d33-fe
           ports:
             - containerPort: 80
           securityContext:
